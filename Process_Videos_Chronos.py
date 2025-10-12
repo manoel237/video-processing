@@ -19,7 +19,7 @@ SUFIXO_PASTA_SAIDA = "_classificado"
 TEMPO_DE_GRAVACAO_SEGUNDOS = 1.266
 
 # --- Parâmetros de Análise ---
-# Importante: A quantidade de cortes feita precisa ser um número divis~ivel pela resolução da imagem
+# Importante: A quantidade de cortes feita precisa ser um número divisível pela resolução da imagem
 # isso vale horizontalmente e verticalmente
 NUM_FRAMES_BACKGROUND = 250
 NUMERO_DE_CORTES_VERTICAL = 320

@@ -9,7 +9,7 @@ import matplotlib.gridspec as gridspec
 plt.style.use('dark_background')
 
 # 1. Pasta com todos os frames JPG de entrada
-CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\v9.1_FNN_Y202501 1H222055.169729000 (20250627_~190854_UTC)"
+CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\v9.1_FNN_Y202501 1H001644.882607000 (20250626_~210552_UTC)"
 
 # 2. Pasta RAIZ onde todas as pastas de resultado serão criadas.
 PASTA_RAIZ_SAIDAS = r"C:\Users\manoe\Downloads\Testes\Resultados"
@@ -19,13 +19,9 @@ SUFIXO_PASTA_SAIDA = "_classificado"
 # 4. Duração total da gravação em segundos
 TEMPO_DE_GRAVACAO_SEGUNDOS = 1.4996
 
-
 # 5. PARÂMETROS DA ANÁLISE MANUAL
-# Insira o frame e o raio que você quer ver. Ex.: Frame 123 com raio de 3 --> Frames: [ 120,121,122,123,124,125 e 126]
-# ==============================================================================
-FRAME_CENTRAL_ANALISE = 613
-RAIO_FRAMES = 5
-# ==============================================================================
+FRAME_CENTRAL_ANALISE = 1076
+RAIO_FRAMES = 10
 
 # 6. Parâmetros da Análise de Fundo
 NUM_FRAMES_BACKGROUND = 75
@@ -97,12 +93,20 @@ def desenhar_grafico_horizontal(ax, lums_rel):
     ax.margins(y=0)
     ax.invert_yaxis()
 
-def salvar_evento_classificado(caminho_saida, nome_pasta_evento, evento, arquivos_img):
-    """Cria a pasta e copia os frames para um evento classificado."""
+# --- FUNÇÃO MODIFICADA ---
+def salvar_evento_classificado(caminho_saida, nome_pasta_evento, evento, arquivos_img, fig_para_salvar, frame_ref_idx):
+    """Cria a pasta, copia os frames e salva a janela de visualização completa."""
     inicio, fim = evento
     caminho_completo_evento = os.path.join(caminho_saida, nome_pasta_evento)
     os.makedirs(caminho_completo_evento, exist_ok=True)
     print(f"   -> SALVANDO Evento: {fim - inicio + 1} frames ({inicio} a {fim})")
+    
+    # Salva a figura COMPLETA que foi passada como argumento
+    nome_screenshot = f"Analise_Visual_Frame_{frame_ref_idx}.png"
+    caminho_screenshot = os.path.join(caminho_completo_evento, nome_screenshot)
+    fig_para_salvar.savefig(caminho_screenshot, dpi=150, bbox_inches='tight')
+
+    # Copia os frames do intervalo
     for frame_idx in range(inicio, fim + 1):
         src_path = arquivos_img[frame_idx]
         dst_path = os.path.join(caminho_completo_evento, os.path.basename(src_path))
@@ -193,19 +197,27 @@ if __name__ == "__main__":
         def on_key_press(event):
             key = event.key
             if key == 'right':
-                if state['current_idx'] < fim_intervalo: state['current_idx'] += 1
+                if state['current_idx'] < fim_intervalo: 
+                    state['current_idx'] += 1
+                    update_display(state['current_idx'])
             elif key == 'left':
-                if state['current_idx'] > inicio_intervalo: state['current_idx'] -= 1
+                if state['current_idx'] > inicio_intervalo: 
+                    state['current_idx'] -= 1
+                    update_display(state['current_idx'])
             elif key == 'up':
-                if state['current_idx'] != inicio_intervalo: state['current_idx'] = inicio_intervalo
+                if state['current_idx'] != inicio_intervalo: 
+                    state['current_idx'] = inicio_intervalo
+                    update_display(state['current_idx'])
             elif key == 'down':
-                if state['current_idx'] != fim_intervalo: state['current_idx'] = fim_intervalo
+                if state['current_idx'] != fim_intervalo: 
+                    state['current_idx'] = fim_intervalo
+                    update_display(state['current_idx'])
             elif key in ['c', 'i', 'b', 'n', 'q']:
                 user_choice['key'] = key
+                # Não fecha a figura aqui, para que possamos salvá-la
                 plt.close(event.canvas.figure)
                 return
-            update_display(state['current_idx'])
-
+            
         update_display(state['current_idx'])
         posicionar_janela(fig)
         fig.canvas.mpl_connect('key_press_event', on_key_press)
@@ -227,7 +239,8 @@ if __name__ == "__main__":
             duracao_evento_ms = num_frames_evento * tempo_por_frame_ms
             nome_pasta_evento = f"{frame_referencia_idx:04d} {classificacao} {timestamp_str} Dur {duracao_evento_ms:.1f}ms"
             
-            salvar_evento_classificado(caminho_final_saida, nome_pasta_evento, evento_analisado, arquivos_img)
+            # --- CHAMADA MODIFICADA ---
+            salvar_evento_classificado(caminho_final_saida, nome_pasta_evento, evento_analisado, arquivos_img, fig, frame_referencia_idx)
             print(f"Evento salvo em: {os.path.join(caminho_final_saida, nome_pasta_evento)}")
             
         elif resposta == 'n':
