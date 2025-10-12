@@ -8,7 +8,36 @@ import matplotlib.gridspec as gridspec
 
 plt.style.use('dark_background')
 
-# --- NOVA FUNÇÃO AUXILIAR PARA ANÁLISE DE ESTRUTURA ---
+# Algumas considerações: Esse código foi personalizado para funcionar com os dados da Chronos, logo pode não ter um bom desempenho para
+# os videos da Phantom ou outra câmera com comportamentos diferentes;
+
+# --- PARÂMETROS DE CONFIGURAÇÃO (Fixo para Cronos) ---
+print("--- Câmera CRONOS selecionada ---")
+CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\framesLCC2"
+PASTA_RAIZ_SAIDAS = r"C:\Users\manoe\Downloads\Testes\Resultados"
+SUFIXO_PASTA_SAIDA = "_classificado"
+TEMPO_DE_GRAVACAO_SEGUNDOS = 1.266
+
+# --- Parâmetros de Análise ---
+# Importante: A quantidade de cortes feita precisa ser um número divis~ivel pela resolução da imagem
+# isso vale horizontalmente e verticalmente
+NUM_FRAMES_BACKGROUND = 250
+NUMERO_DE_CORTES_VERTICAL = 320
+NUMERO_DE_CORTES_HORIZONTAL = 256
+
+# Sensibilidade da classificação - Quanto maior menos sensível; Recomendado = 80 ou menos
+PERCENTIL = 80 # Quanto maior mais seletivo é o sistema
+
+# Esse parâmetro é crucial para pegar casos difíceis, de baixa amplitude e com picos mal definidos
+# No entanto pode acabar gerando um número muito maior de possíveis casos, muitos deles falsos casos
+USAR_ANALISE_CONTIGUIDADE = True
+MIN_FATIAS_CONTIGUAS = 20          
+LIMIAR_BRILHO_CONTIGUIDADE = 0.1 
+
+# --- Parâmetros de Agrupamento --- Esses valores foram obtidos a mão e assim conseguimos separar os eventos
+MAX_GAP_ENTRE_FRAMES = 2
+FOLGA_FRAMES = 2
+
 def encontrar_maior_sequencia_contigua(array_booleano):
     """Encontra o comprimento da maior sequência de valores True em um array."""
     if not array_booleano.any():
@@ -22,32 +51,6 @@ def encontrar_maior_sequencia_contigua(array_booleano):
             maior_contagem = max(maior_contagem, contagem_atual)
             contagem_atual = 0
     return max(maior_contagem, contagem_atual)
-
-# --- PARÂMETROS DE CONFIGURAÇÃO (Fixo para Cronos) ---
-print("--- Câmera CRONOS selecionada ---")
-CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\framesLCC2"
-PASTA_RAIZ_SAIDAS = r"C:\Users\manoe\Downloads\Testes\Resultados"
-SUFIXO_PASTA_SAIDA = "_classificado"
-TEMPO_DE_GRAVACAO_SEGUNDOS = 1.266
-
-# --- Parâmetros de Análise ---
-NUM_FRAMES_BACKGROUND = 250
-NUMERO_DE_CORTES_VERTICAL = 320
-NUMERO_DE_CORTES_HORIZONTAL = 256
-
-# --- PARÂMETROS DE DETECÇÃO AVANÇADA ---
-# Parâmetros Globais de Sensibilidade
-PERCENTIL = 80 # Quanto maior mais seletivo é o sistema
-
-# Parâmetros da Análise de Estrutura (Contiguidade)
-USAR_ANALISE_CONTIGUIDADE = True  # << LIGUE (True) ou DESLIGUE (False)
-MIN_FATIAS_CONTIGUAS = 20          # << Mínimo de fatias em sequência para ser considerado estruturado
-LIMIAR_BRILHO_CONTIGUIDADE = 0.1 # O quão brilhante uma fatia deve ser para contar
-
-# --- Parâmetros de Agrupamento --- Esses valores foram obtidos a mão e assim conseguimos separar os eventos
-MAX_GAP_ENTRE_FRAMES = 2
-FOLGA_FRAMES = 2
-
 
 def calcular_vetores_referencia(arquivos_img, num_frames_bg, num_cortes_v, num_cortes_h):
     """Calcula a luminosidade de fundo média para os cortes verticais e horizontais."""
