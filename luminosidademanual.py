@@ -9,7 +9,7 @@ import matplotlib.gridspec as gridspec
 plt.style.use('dark_background')
 
 # 1. Pasta com todos os frames JPG de entrada
-CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\framesLCC2"
+CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\v9.1_FNN_Y202501 1H222055.169729000 (20250627_~190854_UTC)"
 
 # 2. Pasta RAIZ onde todas as pastas de resultado serão criadas.
 PASTA_RAIZ_SAIDAS = r"C:\Users\manoe\Downloads\Testes\Resultados"
@@ -19,17 +19,18 @@ SUFIXO_PASTA_SAIDA = "_classificado"
 # 4. Duração total da gravação em segundos
 TEMPO_DE_GRAVACAO_SEGUNDOS = 1.4996
 
-# ==============================================================================
+
 # 5. PARÂMETROS DA ANÁLISE MANUAL
+# Insira o frame e o raio que você quer ver. Ex.: Frame 123 com raio de 3 --> Frames: [ 120,121,122,123,124,125 e 126]
 # ==============================================================================
 FRAME_CENTRAL_ANALISE = 613
 RAIO_FRAMES = 5
 # ==============================================================================
 
 # 6. Parâmetros da Análise de Fundo
-NUM_FRAMES_BACKGROUND = 250
-NUMERO_DE_CORTES_VERTICAL = 320
-NUMERO_DE_CORTES_HORIZONTAL = 256 # << ADICIONADO para a análise horizontal
+NUM_FRAMES_BACKGROUND = 75
+NUMERO_DE_CORTES_VERTICAL = 336
+NUMERO_DE_CORTES_HORIZONTAL = 252 
 
 def calcular_vetores_referencia(arquivos_img, num_frames_bg, num_cortes_v, num_cortes_h):
     """Calcula a luminosidade de fundo média para os cortes verticais e horizontais."""
@@ -39,7 +40,7 @@ def calcular_vetores_referencia(arquivos_img, num_frames_bg, num_cortes_v, num_c
     
     frames_para_bg = arquivos_img[:num_frames_bg]
     soma_medias_v = np.zeros(num_cortes_v)
-    soma_medias_h = np.zeros(num_cortes_h) # << ADICIONADO
+    soma_medias_h = np.zeros(num_cortes_h) 
     
     for i, caminho_frame in enumerate(frames_para_bg):
         print(f"   Lendo frame de background {i+1}/{num_frames_bg}...", end='\r')
@@ -50,7 +51,7 @@ def calcular_vetores_referencia(arquivos_img, num_frames_bg, num_cortes_v, num_c
         cortes_v = np.array_split(img_cinza, num_cortes_v, axis=1)
         soma_medias_v += np.array([np.mean(corte) for corte in cortes_v])
         
-        # Análise Horizontal << ADICIONADO
+        # Análise Horizontal
         cortes_h = np.array_split(img_cinza, num_cortes_h, axis=0)
         soma_medias_h += np.array([np.mean(corte) for corte in cortes_h])
 
@@ -68,7 +69,7 @@ def analisar_frame(img_path, vetor_ref_v, vetor_ref_h, num_cortes_v, num_cortes_
     lums_rel_v = np.array(medias_abs_v) - vetor_ref_v
     valor_maximo = np.max(lums_rel_v)
 
-    # Análise Horizontal << ADICIONADO
+    # Análise Horizontal
     cortes_h = np.array_split(img_cinza, num_cortes_h, axis=0)
     medias_abs_h = [np.mean(corte) for corte in cortes_h]
     lums_rel_h = np.array(medias_abs_h) - vetor_ref_h
@@ -85,7 +86,6 @@ def desenhar_grafico_vertical(ax, lums_rel):
     ax.grid(axis='y', linestyle=':', alpha=0.7)
     ax.margins(x=0)
 
-# << FUNÇÃO ADICIONADA >>
 def desenhar_grafico_horizontal(ax, lums_rel):
     """Desenha o gráfico de barras horizontais em um eixo."""
     indices = np.arange(len(lums_rel))
@@ -136,7 +136,6 @@ if __name__ == "__main__":
         tempo_por_frame_ms = (TEMPO_DE_GRAVACAO_SEGUNDOS * 1000) / total_frames
         print(f"Tempo por frame calculado: {tempo_por_frame_ms:.2f} ms")
         
-        # << ALTERADO para calcular ambos os vetores >>
         vetor_ref_v, vetor_ref_h = calcular_vetores_referencia(arquivos_img, NUM_FRAMES_BACKGROUND, NUMERO_DE_CORTES_VERTICAL, NUMERO_DE_CORTES_HORIZONTAL)
         
         print(f"\nFASE DE ANÁLISE: Coletando métricas de todos os {total_frames} frames...")
@@ -163,7 +162,6 @@ if __name__ == "__main__":
         state = {'current_idx': FRAME_CENTRAL_ANALISE}
         evento_analisado = (inicio_intervalo, fim_intervalo)
 
-        # << ALTERADO para o layout com gridspec >>
         fig = plt.figure(figsize=(LARGURA_JANELA_PIXELS/100, ALTURA_JANELA_PIXELS/100), dpi=100)
         gs = gridspec.GridSpec(4, 5, figure=fig)
         ax_img = fig.add_subplot(gs[0:3, 0:4])
@@ -177,7 +175,7 @@ if __name__ == "__main__":
             
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             lums_rel_v = all_lums_rel_vectors_v[index_to_show]
-            lums_rel_h = all_lums_rel_vectors_h[index_to_show] # << Pega os dados horizontais
+            lums_rel_h = all_lums_rel_vectors_h[index_to_show] 
             
             ax_img.clear(); ax_v.clear(); ax_h.clear()
             
@@ -186,7 +184,7 @@ if __name__ == "__main__":
             ax_img.axis('off')
             
             desenhar_grafico_vertical(ax_v, lums_rel_v)
-            desenhar_grafico_horizontal(ax_h, lums_rel_h) # << Desenha o gráfico horizontal
+            desenhar_grafico_horizontal(ax_h, lums_rel_h)
             
             fig.suptitle(f"Análise Manual | Frames {inicio_intervalo}-{fim_intervalo} | (c=CG / i=IC / b=BF / n=NÃO / q=SAIR)", fontsize=12)
             fig.tight_layout(rect=[0, 0.03, 1, 0.97])
