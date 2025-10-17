@@ -13,9 +13,13 @@ plt.style.use('dark_background')
 
 # --- PARÂMETROS DE CONFIGURAÇÃO (Fixo para Cronos) ---
 print("--- Câmera CRONOS selecionada ---")
-CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\framesLCC2"
-PASTA_RAIZ_SAIDAS = r"C:\Users\manoe\Downloads\Testes\Resultados"
-SUFIXO_PASTA_SAIDA = "_classificado"
+# PASTA DE FRAMES EXTRAÍDOS DO VÍDEO
+CAMINHO_PASTA_ENTRADA = r"D:\videos\vid_2025-09-23\2025-09-23-01-25-06-807268700\frames-2025-09-23-01-25-06-807268700"
+
+# PASTA RAIZ ONDE AS PASTAS CLASSIFICADAS SERÃO SALVAS
+PASTA_RAIZ_SAIDAS     = r"D:\videos\RESULTADOS"
+
+SUFIXO_PASTA_SAIDA     = "_classificado"
 TEMPO_DE_GRAVACAO_SEGUNDOS = 1.266
 
 # --- Parâmetros de Análise ---
