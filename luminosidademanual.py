@@ -9,10 +9,10 @@ import matplotlib.gridspec as gridspec
 plt.style.use('dark_background')
 
 # 1. Pasta com todos os frames JPG de entrada
-CAMINHO_PASTA_ENTRADA = r"C:\Users\manoe\Downloads\Testes\v9.1_FNN_Y202501 1H001644.882607000 (20250626_~210552_UTC)"
+CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y202501 1H223408.552377000 (20250627_~192208_UTC)"
 
 # 2. Pasta RAIZ onde todas as pastas de resultado serão criadas.
-PASTA_RAIZ_SAIDAS = r"C:\Users\manoe\Downloads\Testes\Resultados"
+PASTA_RAIZ_SAIDAS = r"C:\Arquivos\Videos\videos_classificados"
 # 3. Sufixo para adicionar ao nome da pasta de saída.
 SUFIXO_PASTA_SAIDA = "_classificado"
 
@@ -20,8 +20,8 @@ SUFIXO_PASTA_SAIDA = "_classificado"
 TEMPO_DE_GRAVACAO_SEGUNDOS = 1.4996
 
 # 5. PARÂMETROS DA ANÁLISE MANUAL
-FRAME_CENTRAL_ANALISE = 1076
-RAIO_FRAMES = 10
+FRAME_CENTRAL_ANALISE = 653
+RAIO_FRAMES = 20
 
 # 6. Parâmetros da Análise de Fundo
 NUM_FRAMES_BACKGROUND = 75

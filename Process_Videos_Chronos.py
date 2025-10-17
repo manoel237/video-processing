@@ -30,13 +30,13 @@ NUMERO_DE_CORTES_VERTICAL = 320
 NUMERO_DE_CORTES_HORIZONTAL = 256
 
 # Sensibilidade da classificação - Quanto maior menos sensível; Recomendado = 80 ou menos
-PERCENTIL = 80 # Quanto maior mais seletivo é o sistema
+PERCENTIL = 98 # Quanto maior mais seletivo é o sistema
 
 # Esse parâmetro é crucial para pegar casos difíceis, de baixa amplitude e com picos mal definidos
 # No entanto pode acabar gerando um número muito maior de possíveis casos, muitos deles falsos casos
 USAR_ANALISE_CONTIGUIDADE = True
 MIN_FATIAS_CONTIGUAS = 20          
-LIMIAR_BRILHO_CONTIGUIDADE = 0.1 
+LIMIAR_BRILHO_CONTIGUIDADE = 0.1
 
 # --- Parâmetros de Agrupamento --- Esses valores foram obtidos a mão e assim conseguimos separar os eventos
 MAX_GAP_ENTRE_FRAMES = 2

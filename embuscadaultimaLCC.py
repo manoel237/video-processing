@@ -8,30 +8,45 @@ import matplotlib.gridspec as gridspec
 
 plt.style.use('dark_background')
 
-# 1. Pasta com todos os frames JPG de entrada
-CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y202507 3H195721.314922000_UTC"
-# 2. Pasta RAIZ onde todas as pastas de resultado serão criadas.
-PASTA_RAIZ_SAIDAS = r"C:\Arquivos\Videos\videos_classificados"
+def encontrar_maior_sequencia_contigua(array_booleano):
+    """Encontra o comprimento da maior sequência de valores True em um array."""
+    if not array_booleano.any():
+        return 0
+    maior_contagem = 0
+    contagem_atual = 0
+    for valor in array_booleano:
+        if valor:
+            contagem_atual += 1
+        else:
+            maior_contagem = max(maior_contagem, contagem_atual)
+            contagem_atual = 0
+    return max(maior_contagem, contagem_atual)
 
-# 3. Sufixo para adicionar ao nome da pasta de saída.
+# --- PARÂMETROS DE CONFIGURAÇÃO (Fixo para Cronos) ---
+print("--- Câmera CRONOS selecionada ---")
+CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y202507 3H194133.265708000_UTC"
+PASTA_RAIZ_SAIDAS = r"C:\Arquivos\Videos\outcronos"
 SUFIXO_PASTA_SAIDA = "_classificado"
+TEMPO_DE_GRAVACAO_SEGUNDOS = 1.4996
 
-# 4. Duração total da gravação em segundos
-TEMPO_DE_GRAVACAO_SEGUNDOS = 1.266247
+# --- Parâmetros de Análise ---
+NUM_FRAMES_BACKGROUND = 250
+NUMERO_DE_CORTES_VERTICAL = 320
+NUMERO_DE_CORTES_HORIZONTAL = 256
 
-# 5. Parâmetros da Análise
-NUM_FRAMES_BACKGROUND = 75
+# --- Parâmetros de Detecção ---
+PERCENTIL = 60
+USAR_ANALISE_CONTIGUIDADE = True
+MIN_FATIAS_CONTIGUAS = 15
+LIMIAR_BRILHO_CONTIGUIDADE = 0.2
 
-# 6. Parâmetros de criação de dados
-NUMERO_DE_CORTES_VERTICAL = 336
-NUMERO_DE_CORTES_HORIZONTAL = 252 
+# --- PARÂMETROS DE FILTRAGEM DE EVENTOS LONGOS (LCC) ---
+USAR_FILTRO_LCC = True
+DURACAO_MINIMA_LCC = 40
 
-# 7. # Sensibilidade da classificação
-PERCENTIL = 85
-
-# 8. Parâmetros de Agrupamento de Eventos
-MAX_GAP_ENTRE_FRAMES = 6
-FOLGA_FRAMES = 2
+# --- Parâmetros de Agrupamento ---
+MAX_GAP_ENTRE_FRAMES = 10
+FOLGA_FRAMES = 10
 
 
 def calcular_vetores_referencia(arquivos_img, num_frames_bg, num_cortes_v, num_cortes_h):
@@ -59,26 +74,35 @@ def calcular_vetores_referencia(arquivos_img, num_frames_bg, num_cortes_v, num_c
     return (soma_medias_v / num_frames_bg), (soma_medias_h / num_frames_bg)
 
 def analisar_frame(img_path, vetor_ref_v, vetor_ref_h, num_cortes_v, num_cortes_h):
-    """Calcula as métricas verticais e os vetores de luminosidade para ambas as direções."""
+    """Calcula as métricas globais e a nova métrica de contiguidade para um frame."""
     img_cinza = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-    if img_cinza is None: return None, None, None, None
+    if img_cinza is None: return None
     
-    # Análise Vertical (para detecção e plot)
     cortes_v = np.array_split(img_cinza, num_cortes_v, axis=1)
     medias_abs_v = [np.mean(corte) for corte in cortes_v]
     lums_rel_v = np.array(medias_abs_v) - vetor_ref_v
-    desvio_padrao = np.std(lums_rel_v)
-    valor_maximo = np.max(lums_rel_v)
+    dp_v = np.std(lums_rel_v)
+    vmax_v = np.max(lums_rel_v)
 
-    # Análise Horizontal (apenas para plot)
+    contiguidade_v = 0
+    if USAR_ANALISE_CONTIGUIDADE:
+        fatias_ativas_v = lums_rel_v > LIMIAR_BRILHO_CONTIGUIDADE
+        contiguidade_v = encontrar_maior_sequencia_contigua(fatias_ativas_v)
+
     cortes_h = np.array_split(img_cinza, num_cortes_h, axis=0)
     medias_abs_h = [np.mean(corte) for corte in cortes_h]
     lums_rel_h = np.array(medias_abs_h) - vetor_ref_h
+    dp_h = np.std(lums_rel_h)
+    vmax_h = np.max(lums_rel_h)
+
+    contiguidade_h = 0
+    if USAR_ANALISE_CONTIGUIDADE:
+        fatias_ativas_h = lums_rel_h > LIMIAR_BRILHO_CONTIGUIDADE
+        contiguidade_h = encontrar_maior_sequencia_contigua(fatias_ativas_h)
     
-    return desvio_padrao, valor_maximo, lums_rel_v, lums_rel_h
+    return (dp_v, vmax_v, lums_rel_v, contiguidade_v), (dp_h, vmax_h, lums_rel_h, contiguidade_h)
 
 def agrupar_em_eventos(indices_chave, max_gap, folga, total_frames):
-    """Agrupa frames-chave consecutivos em eventos e adiciona a folga."""
     if not indices_chave: return []
     eventos = []
     evento_atual = [indices_chave[0]]
@@ -96,17 +120,15 @@ def agrupar_em_eventos(indices_chave, max_gap, folga, total_frames):
     return eventos
 
 def desenhar_grafico_vertical(ax, lums_rel):
-    """Desenha o gráfico de barras verticais em um eixo (ax) específico do Matplotlib."""
     indices = np.arange(len(lums_rel))
     cores = ['#2ca02c' if val >= 0 else '#d62728' for val in lums_rel]
     ax.bar(indices, lums_rel, color=cores)
     ax.axhline(0, color='black', linestyle='--', linewidth=1)
-    ax.set_ylabel('Luminosidade Relativa', fontsize=10)
+    ax.set_ylabel('Lum. Relativa', fontsize=10)
     ax.grid(axis='y', linestyle=':', alpha=0.7)
     ax.margins(x=0)
 
 def desenhar_grafico_horizontal(ax, lums_rel):
-    """Desenha o gráfico de barras horizontais em um eixo."""
     indices = np.arange(len(lums_rel))
     cores = ['#2ca02c' if val >= 0 else '#d62728' for val in lums_rel]
     ax.barh(indices, lums_rel, color=cores)
@@ -116,17 +138,16 @@ def desenhar_grafico_horizontal(ax, lums_rel):
     ax.margins(y=0)
     ax.invert_yaxis()
 
-# ALTERADO: Adicionado 'fig_para_salvar' como argumento
-def salvar_evento_classificado(caminho_saida, nome_pasta_evento, evento, arquivos_img, fig_para_salvar, frame_pico_idx):
-    inicio, fim = evento
+def salvar_evento_classificado(caminho_saida, nome_pasta_evento, evento_editado, arquivos_img, fig_para_salvar):
+    inicio, fim = evento_editado
     caminho_completo_evento = os.path.join(caminho_saida, nome_pasta_evento)
+    # A pasta principal já foi criada, então só precisamos criar a subpasta do evento
     os.makedirs(caminho_completo_evento, exist_ok=True)
     print(f"   -> SALVANDO Evento: {fim - inicio + 1} frames ({inicio} a {fim})")
     
-    # Salva a figura COMPLETA
-    nome_screenshot = f"Evento_Classificado_Frame_{frame_pico_idx}.png"
+    nome_screenshot = f"Analise_Visual_{os.path.basename(nome_pasta_evento)}.png"
     caminho_screenshot = os.path.join(caminho_completo_evento, nome_screenshot)
-    fig_para_salvar.savefig(caminho_screenshot, dpi=150, bbox_inches='tight') # dpi para melhor qualidade
+    fig_para_salvar.savefig(caminho_screenshot, dpi=150, bbox_inches='tight')
 
     for frame_idx in range(inicio, fim + 1):
         src_path = arquivos_img[frame_idx]
@@ -155,61 +176,97 @@ if __name__ == "__main__":
         print(f"Pasta de entrada: {CAMINHO_PASTA_ENTRADA}")
         print(f"Pasta de saída será criada em: {caminho_final_saida}")
         
-        os.makedirs(caminho_final_saida, exist_ok=True)
+        # A LINHA 'os.makedirs' FOI REMOVIDA DAQUI
+        
         arquivos_img = sorted(glob.glob(os.path.join(CAMINHO_PASTA_ENTRADA, '*.jpg')))
         total_frames = len(arquivos_img)
         print(f"Análise iniciada. {total_frames} frames encontrados.")
         
         tempo_por_frame_ms = (TEMPO_DE_GRAVACAO_SEGUNDOS * 1000) / total_frames
-        print(f"Tempo por frame calculado: {tempo_por_frame_ms:.2f} ms")
         
-        vetor_ref_v, vetor_ref_h = calcular_vetores_referencia(arquivos_img, NUM_FRAMES_BACKGROUND, NUMERO_DE_CORTES_VERTICAL, NUMERO_DE_CORTES_HORIZONTAL)
+        vetor_ref_v, vetor_ref_h = calcular_vetores_referencia(
+            arquivos_img, NUM_FRAMES_BACKGROUND, NUMERO_DE_CORTES_VERTICAL, NUMERO_DE_CORTES_HORIZONTAL
+        )
         
         print(f"\nFASE DE DETECÇÃO: Coletando métricas de todos os {total_frames} frames...")
-        all_std_devs, all_max_vals, all_lums_rel_vectors = [], [], []
-        all_lums_rel_vectors_h = [] 
+        all_metrics_v = []
+        all_metrics_h = []
         
         for i, img_path in enumerate(arquivos_img):
             print(f"   Processando frame {i+1}/{total_frames}...", end='\r')
-            dp, vmax, lums_rel_v, lums_rel_h = analisar_frame(img_path, vetor_ref_v, vetor_ref_h, NUMERO_DE_CORTES_VERTICAL, NUMERO_DE_CORTES_HORIZONTAL)
-            if dp is not None:
-                all_std_devs.append(dp)
-                all_max_vals.append(vmax)
-                all_lums_rel_vectors.append(lums_rel_v)
-                all_lums_rel_vectors_h.append(lums_rel_h)
+            result = analisar_frame(
+                img_path, vetor_ref_v, vetor_ref_h, NUMERO_DE_CORTES_VERTICAL, NUMERO_DE_CORTES_HORIZONTAL
+            )
+            if result:
+                all_metrics_v.append(result[0])
+                all_metrics_h.append(result[1])
         print("\nColeta de métricas concluída.")
         
-        limiar_dp_adaptativo = np.percentile(all_std_devs, PERCENTIL)
-        limiar_pico_adaptativo = np.percentile(all_max_vals, PERCENTIL)
+        all_std_devs_v, all_max_vals_v, all_lums_v, all_contig_v = zip(*all_metrics_v)
+        all_std_devs_h, all_max_vals_h, all_lums_h, all_contig_h = zip(*all_metrics_h)
+        
+        limiar_dp_v = np.percentile(all_std_devs_v, PERCENTIL)
+        limiar_pico_v = np.percentile(all_max_vals_v, PERCENTIL)
+        limiar_dp_h = np.percentile(all_std_devs_h, PERCENTIL)
+        limiar_pico_h = np.percentile(all_max_vals_h, PERCENTIL)
         
         frames_chave_indices = []
-        for i in range(len(all_std_devs)):
-            if all_std_devs[i] > limiar_dp_adaptativo and all_max_vals[i] > limiar_pico_adaptativo:
+        for i in range(len(all_std_devs_v)):
+            passou_sensibilidade_global = (all_std_devs_v[i] > limiar_dp_v or all_max_vals_v[i] > limiar_pico_v) or \
+                                         (all_std_devs_h[i] > limiar_dp_h or all_max_vals_h[i] > limiar_pico_h)
+            
+            if not passou_sensibilidade_global:
+                continue
+
+            if USAR_ANALISE_CONTIGUIDADE:
+                tem_estrutura_minima = all_contig_v[i] >= MIN_FATIAS_CONTIGUAS or \
+                                         all_contig_h[i] >= MIN_FATIAS_CONTIGUAS
+                
+                if tem_estrutura_minima:
+                    frames_chave_indices.append(i)
+            else:
                 frames_chave_indices.append(i)
         
         eventos_candidatos = agrupar_em_eventos(frames_chave_indices, MAX_GAP_ENTRE_FRAMES, FOLGA_FRAMES, total_frames)
-        
         print(f"\nDETECÇÃO AUTOMÁTICA CONCLUÍDA: {len(eventos_candidatos)} eventos candidatos encontrados.")
+
+        if USAR_FILTRO_LCC:
+            print(f"Filtrando por eventos com duração >= {DURACAO_MINIMA_LCC} frames...")
+            eventos_filtrados = []
+            for evento in eventos_candidatos:
+                inicio, fim = evento
+                duracao = fim - inicio + 1
+                if duracao >= DURACAO_MINIMA_LCC:
+                    eventos_filtrados.append(evento)
+            
+            print(f"Filtragem concluída. {len(eventos_filtrados)} eventos longos (LCC) encontrados.")
+            eventos_candidatos = eventos_filtrados
+        
+        eventos_salvos = 0
+        user_choice = {'key': None}
 
         if not eventos_candidatos:
             print("Nenhum evento candidato para validar. Encerrando.")
         else:
-            print("\n--- INICIANDO SESSÃO DE CLASSIFICAÇÃO ---")
-            print("Use as SETAS (<-,->, para cima e para baixo) para navegar. Pressione 'c' para CG, 'i' para IC, 'b' para BF, 'n' para NÃO, 'q' para SAIR.")
+            # --- MODIFICADO: Cria a pasta principal somente se houver eventos para classificar ---
+            print("Eventos encontrados. Criando pasta de saída...")
+            os.makedirs(caminho_final_saida, exist_ok=True)
             
-            eventos_salvos = 0
-            user_choice = {'key': None}
-
+            print("\n--- INICIANDO SESSÃO DE CLASSIFICAÇÃO ---")
+            print("Navegação livre! Use as SETAS. 'P' define INÍCIO, 'U' define FIM.")
+            print("Classifique com: 'c' para CG, 'i' para IC, 'b' para BF, 'l' para LCC, 'n' para NÃO, 'q' para SAIR.")
+            
             for i, evento in enumerate(eventos_candidatos):
-                inicio, fim = evento
+                inicio_sugerido, fim_sugerido = evento
                 
-                intervalo_max_vals = all_max_vals[inicio:fim+1]
-                if not intervalo_max_vals: continue
+                intervalo_max_vals_v = [all_max_vals_v[j] for j in range(inicio_sugerido, fim_sugerido + 1)]
+                if not intervalo_max_vals_v: continue
                 
-                indice_local_pico = np.argmax(intervalo_max_vals)
-                indice_global_pico = inicio + indice_local_pico
-                
+                indice_local_pico = np.argmax(intervalo_max_vals_v)
+                indice_global_pico = inicio_sugerido + indice_local_pico
                 state = {'current_idx': indice_global_pico}
+                
+                limites_evento = {'inicio': inicio_sugerido, 'fim': fim_sugerido}
                 
                 fig = plt.figure(figsize=(LARGURA_JANELA_PIXELS/100, ALTURA_JANELA_PIXELS/100), dpi=100)
                 gs = gridspec.GridSpec(4, 5, figure=fig)
@@ -219,12 +276,10 @@ if __name__ == "__main__":
                 
                 def update_display(index_to_show):
                     caminho_img = arquivos_img[index_to_show]
-                    img_bgr = cv2.imread(caminho_img)
-                    if img_bgr is None: return
+                    img_rgb = cv2.cvtColor(cv2.imread(caminho_img), cv2.COLOR_BGR2RGB)
                     
-                    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-                    lums_rel_v = all_lums_rel_vectors[index_to_show]
-                    lums_rel_h = all_lums_rel_vectors_h[index_to_show]
+                    lums_rel_v = all_lums_v[index_to_show]
+                    lums_rel_h = all_lums_h[index_to_show]
                     
                     ax_img.clear(); ax_v.clear(); ax_h.clear()
                     
@@ -235,36 +290,38 @@ if __name__ == "__main__":
                     desenhar_grafico_vertical(ax_v, lums_rel_v)
                     desenhar_grafico_horizontal(ax_h, lums_rel_h)
                     
-                    fig.suptitle(f"Evento {i+1}/{len(eventos_candidatos)} | Frames {inicio}-{fim} | (c=CG / i=IC / b=BF / n=NÃO / q=SAIR)", fontsize=12)
-                    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-                    
-                    pos_img = ax_img.get_position()
-                    pos_h = ax_h.get_position()
-                    ax_h.set_position([pos_h.x0, pos_img.y0, pos_h.width, pos_img.height])
-                    
+                    titulo = (f"Evento {i+1}/{len(eventos_candidatos)} | "
+                              f"Editando Frames [{limites_evento['inicio']}-{limites_evento['fim']}] | "
+                              f"(p=Início, u=Fim, c/i/b/l/n/q=Classificar)")
+                    fig.suptitle(titulo, fontsize=12)
+                    fig.tight_layout(rect=[0, 0.03, 1, 0.97])
                     fig.canvas.draw_idle()
 
                 def on_key_press(event):
                     key = event.key
+                    
                     if key == 'right':
-                        if state['current_idx'] < fim:
+                        if state['current_idx'] < total_frames - 1:
                             state['current_idx'] += 1
-                            update_display(state['current_idx'])
                     elif key == 'left':
-                        if state['current_idx'] > inicio:
+                        if state['current_idx'] > 0:
                             state['current_idx'] -= 1
-                            update_display(state['current_idx'])
                     elif key == 'up':
-                        if state['current_idx'] != inicio:
-                            state['current_idx'] = inicio
-                            update_display(state['current_idx'])
+                        state['current_idx'] = limites_evento['inicio']
                     elif key == 'down':
-                        if state['current_idx'] != fim:
-                            state['current_idx'] = fim
-                            update_display(state['current_idx'])
-                    elif key in ['c', 'i', 'b', 'n', 'q']:
+                        state['current_idx'] = limites_evento['fim']
+                    elif key == 'p':
+                        limites_evento['inicio'] = state['current_idx']
+                        print(f"** Novo INÍCIO definido para o frame: {limites_evento['inicio']} **")
+                    elif key == 'u':
+                        limites_evento['fim'] = state['current_idx']
+                        print(f"** Novo FIM definido para o frame: {limites_evento['fim']} **")
+                    elif key in ['c', 'i', 'b', 'l', 'n', 'q']:
                         user_choice['key'] = key
                         plt.close(event.canvas.figure)
+                        return
+                    
+                    update_display(state['current_idx'])
 
                 update_display(state['current_idx'])
                 posicionar_janela(fig)
@@ -273,23 +330,33 @@ if __name__ == "__main__":
                 
                 resposta = user_choice['key']
 
-                if resposta in ['c', 'i', 'b']:
+                if resposta in ['c', 'i', 'b', 'l']:
                     if resposta == 'c': classificacao = 'CG'
                     elif resposta == 'i': classificacao = 'IC'
-                    else: classificacao = 'Brilho' 
+                    elif resposta == 'b': classificacao = 'Brilho'
+                    elif resposta == 'l': classificacao = 'LCC'
                     
                     print(f"Evento {i+1} CLASSIFICADO como {classificacao}.")
                     
                     frame_referencia_idx = state['current_idx']
                     nome_arquivo_ref = os.path.basename(arquivos_img[frame_referencia_idx])
-                    timestamp_str = os.path.splitext(nome_arquivo_ref)[0].split('_', 1)[1]
-                    num_frames_evento = fim - inicio + 1
+                    
+                    try:
+                        timestamp_str = os.path.splitext(nome_arquivo_ref)[0].split('_', 1)[1]
+                    except IndexError:
+                        print(f"\nAVISO: Não foi possível extrair timestamp do arquivo '{nome_arquivo_ref}'. Usando nome base.")
+                        timestamp_str = os.path.splitext(nome_arquivo_ref)[0]
+
+                    num_frames_evento = limites_evento['fim'] - limites_evento['inicio'] + 1
                     duracao_evento_ms = num_frames_evento * tempo_por_frame_ms
                     
                     nome_pasta_evento = f"{frame_referencia_idx:04d} {classificacao} {timestamp_str} Dur {duracao_evento_ms:.1f}ms"
                     
-                    # ALTERADO: Passando a figura atual (fig) e o índice do frame de pico
-                    salvar_evento_classificado(caminho_final_saida, nome_pasta_evento, evento, arquivos_img, fig, frame_referencia_idx)
+                    evento_final_para_salvar = (limites_evento['inicio'], limites_evento['fim'])
+                    
+                    salvar_evento_classificado(
+                        caminho_final_saida, nome_pasta_evento, evento_final_para_salvar, arquivos_img, fig
+                    )
                     eventos_salvos += 1
                 elif resposta == 'n':
                     print(f"Evento {i+1} REJEITADO.")
@@ -297,8 +364,14 @@ if __name__ == "__main__":
                     print("Sessão de validação encerrada pelo usuário.")
                     break
         
-        print("\n--- VALIDAÇÃO CONCLUÍDA ---")
-        print(f"{eventos_salvos} eventos foram salvos em: {caminho_final_saida}")
+        # --- MODIFICADO: Condição para apagar a pasta se nenhum evento for salvo ---
+        if len(eventos_candidatos) > 0 and eventos_salvos == 0:
+            print("\nNenhum evento foi salvo. Removendo pasta de saída vazia.")
+            # shutil.rmtree() remove a pasta e todo o seu conteúdo
+            shutil.rmtree(caminho_final_saida)
+        elif eventos_salvos > 0:
+             print("\n--- VALIDAÇÃO CONCLUÍDA ---")
+             print(f"{eventos_salvos} eventos foram salvos em: {caminho_final_saida}")
 
     except (FileNotFoundError, ValueError, IndexError) as e:
         print(f"\nERRO: {e}")
