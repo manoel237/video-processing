@@ -24,13 +24,13 @@ def encontrar_maior_sequencia_contigua(array_booleano):
 
 # --- PARÂMETROS DE CONFIGURAÇÃO (Fixo para Cronos) ---
 print("--- Câmera CRONOS selecionada ---")
-CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y202507 3H194133.265708000_UTC"
-PASTA_RAIZ_SAIDAS = r"C:\Arquivos\Videos\outcronos"
+CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y20250717H220002.531309000_UTC"
+PASTA_RAIZ_SAIDAS = r"C:\Arquivos\Videos\videos_classificados"
 SUFIXO_PASTA_SAIDA = "_classificado"
-TEMPO_DE_GRAVACAO_SEGUNDOS = 1.4996
+TEMPO_DE_GRAVACAO_SEGUNDOS = 1.2666
 
 # --- Parâmetros de Análise ---
-NUM_FRAMES_BACKGROUND = 250
+NUM_FRAMES_BACKGROUND = 75
 NUMERO_DE_CORTES_VERTICAL = 320
 NUMERO_DE_CORTES_HORIZONTAL = 256
 
@@ -42,7 +42,7 @@ LIMIAR_BRILHO_CONTIGUIDADE = 0.2
 
 # --- PARÂMETROS DE FILTRAGEM DE EVENTOS LONGOS (LCC) ---
 USAR_FILTRO_LCC = True
-DURACAO_MINIMA_LCC = 40
+DURACAO_MINIMA_LCC = 20
 
 # --- Parâmetros de Agrupamento ---
 MAX_GAP_ENTRE_FRAMES = 10
