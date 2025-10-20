@@ -9,7 +9,7 @@ import matplotlib.gridspec as gridspec
 plt.style.use('dark_background')
 
 # 1. Pasta com todos os frames JPG de entrada
-CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y20250717H220345.004370000_UTC"
+CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y20250816H004139.629850000_UTC"
 # 2. Pasta RAIZ onde todas as pastas de resultado serão criadas.
 PASTA_RAIZ_SAIDAS = r"C:\Arquivos\Videos\videos_classificados"
 
@@ -63,14 +63,12 @@ def analisar_frame(img_path, vetor_ref_v, vetor_ref_h, num_cortes_v, num_cortes_
     img_cinza = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     if img_cinza is None: return None, None, None, None
     
-    # Análise Vertical (para detecção e plot)
     cortes_v = np.array_split(img_cinza, num_cortes_v, axis=1)
     medias_abs_v = [np.mean(corte) for corte in cortes_v]
     lums_rel_v = np.array(medias_abs_v) - vetor_ref_v
     desvio_padrao = np.std(lums_rel_v)
     valor_maximo = np.max(lums_rel_v)
 
-    # Análise Horizontal (apenas para plot)
     cortes_h = np.array_split(img_cinza, num_cortes_h, axis=0)
     medias_abs_h = [np.mean(corte) for corte in cortes_h]
     lums_rel_h = np.array(medias_abs_h) - vetor_ref_h
@@ -96,7 +94,6 @@ def agrupar_em_eventos(indices_chave, max_gap, folga, total_frames):
     return eventos
 
 def desenhar_grafico_vertical(ax, lums_rel):
-    """Desenha o gráfico de barras verticais em um eixo (ax) específico do Matplotlib."""
     indices = np.arange(len(lums_rel))
     cores = ['#2ca02c' if val >= 0 else '#d62728' for val in lums_rel]
     ax.bar(indices, lums_rel, color=cores)
@@ -106,7 +103,6 @@ def desenhar_grafico_vertical(ax, lums_rel):
     ax.margins(x=0)
 
 def desenhar_grafico_horizontal(ax, lums_rel):
-    """Desenha o gráfico de barras horizontais em um eixo."""
     indices = np.arange(len(lums_rel))
     cores = ['#2ca02c' if val >= 0 else '#d62728' for val in lums_rel]
     ax.barh(indices, lums_rel, color=cores)
@@ -116,17 +112,15 @@ def desenhar_grafico_horizontal(ax, lums_rel):
     ax.margins(y=0)
     ax.invert_yaxis()
 
-# ALTERADO: Adicionado 'fig_para_salvar' como argumento
 def salvar_evento_classificado(caminho_saida, nome_pasta_evento, evento, arquivos_img, fig_para_salvar, frame_pico_idx):
     inicio, fim = evento
     caminho_completo_evento = os.path.join(caminho_saida, nome_pasta_evento)
     os.makedirs(caminho_completo_evento, exist_ok=True)
     print(f"   -> SALVANDO Evento: {fim - inicio + 1} frames ({inicio} a {fim})")
     
-    # Salva a figura COMPLETA
     nome_screenshot = f"Evento_Classificado_Frame_{frame_pico_idx}.png"
     caminho_screenshot = os.path.join(caminho_completo_evento, nome_screenshot)
-    fig_para_salvar.savefig(caminho_screenshot, dpi=150, bbox_inches='tight') # dpi para melhor qualidade
+    fig_para_salvar.savefig(caminho_screenshot, dpi=150, bbox_inches='tight')
 
     for frame_idx in range(inicio, fim + 1):
         src_path = arquivos_img[frame_idx]
@@ -148,6 +142,7 @@ if __name__ == "__main__":
             print("\nAviso: Não foi possível posicionar a janela automaticamente.")
     
     try:
+        # ... (código de setup, leitura de arquivos e análise de frames permanece o mesmo) ...
         nome_base_video = os.path.basename(os.path.normpath(CAMINHO_PASTA_ENTRADA))
         nome_pasta_final_saida = f"{nome_base_video}{SUFIXO_PASTA_SAIDA}"
         caminho_final_saida = os.path.join(PASTA_RAIZ_SAIDAS, nome_pasta_final_saida)
@@ -195,22 +190,32 @@ if __name__ == "__main__":
             print("Nenhum evento candidato para validar. Encerrando.")
         else:
             print("\n--- INICIANDO SESSÃO DE CLASSIFICAÇÃO ---")
-            print("Use as SETAS (<-,->, para cima e para baixo) para navegar. Pressione 'c' para CG, 'i' para IC, 'b' para BF, 'n' para NÃO, 'q' para SAIR.")
+            # --- INSTRUÇÕES MODIFICADAS ---
+            print("Navegação de Frames: SETAS | Edição: 'P' (Início), 'U' (Fim)")
+            print("Navegação de Eventos: 'd' (Próximo), 'a' (Anterior)")
+            print("Classificação: 'c' (CG), 'i' (IC), 'b' (BF), 'n' (NÃO), 'q' (SAIR)")
             
             eventos_salvos = 0
             user_choice = {'key': None}
 
-            for i, evento in enumerate(eventos_candidatos):
-                inicio, fim = evento
+            evento_idx = 0
+            while 0 <= evento_idx < len(eventos_candidatos):
+                user_choice['key'] = None
                 
-                intervalo_max_vals = all_max_vals[inicio:fim+1]
-                if not intervalo_max_vals: continue
+                evento = eventos_candidatos[evento_idx]
+                inicio_sugerido, fim_sugerido = evento
+                
+                intervalo_max_vals = all_max_vals[inicio_sugerido:fim_sugerido+1]
+                if not intervalo_max_vals:
+                    evento_idx += 1
+                    continue
                 
                 indice_local_pico = np.argmax(intervalo_max_vals)
-                indice_global_pico = inicio + indice_local_pico
+                indice_global_pico = inicio_sugerido + indice_local_pico
                 
                 state = {'current_idx': indice_global_pico}
-                
+                limites_evento = {'inicio': inicio_sugerido, 'fim': fim_sugerido}
+
                 fig = plt.figure(figsize=(LARGURA_JANELA_PIXELS/100, ALTURA_JANELA_PIXELS/100), dpi=100)
                 gs = gridspec.GridSpec(4, 5, figure=fig)
                 ax_img = fig.add_subplot(gs[0:3, 0:4])
@@ -235,7 +240,10 @@ if __name__ == "__main__":
                     desenhar_grafico_vertical(ax_v, lums_rel_v)
                     desenhar_grafico_horizontal(ax_h, lums_rel_h)
                     
-                    fig.suptitle(f"Evento {i+1}/{len(eventos_candidatos)} | Frames {inicio}-{fim} | (c=CG / i=IC / b=BF / n=NÃO / q=SAIR)", fontsize=12)
+                    titulo = (f"Evento {evento_idx+1}/{len(eventos_candidatos)} | "
+                              f"Editando Frames [{limites_evento['inicio']}-{limites_evento['fim']}]")
+                    fig.suptitle(titulo, fontsize=12)
+                    
                     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
                     
                     pos_img = ax_img.get_position()
@@ -246,25 +254,29 @@ if __name__ == "__main__":
 
                 def on_key_press(event):
                     key = event.key
+                    
                     if key == 'right':
-                        if state['current_idx'] < fim:
-                            state['current_idx'] += 1
-                            update_display(state['current_idx'])
+                        if state['current_idx'] < total_frames - 1: state['current_idx'] += 1
                     elif key == 'left':
-                        if state['current_idx'] > inicio:
-                            state['current_idx'] -= 1
-                            update_display(state['current_idx'])
+                        if state['current_idx'] > 0: state['current_idx'] -= 1
                     elif key == 'up':
-                        if state['current_idx'] != inicio:
-                            state['current_idx'] = inicio
-                            update_display(state['current_idx'])
+                        state['current_idx'] = limites_evento['inicio']
                     elif key == 'down':
-                        if state['current_idx'] != fim:
-                            state['current_idx'] = fim
-                            update_display(state['current_idx'])
-                    elif key in ['c', 'i', 'b', 'n', 'q']:
+                        state['current_idx'] = limites_evento['fim']
+                    elif key == 'p':
+                        limites_evento['inicio'] = state['current_idx']
+                        print(f"** Novo INÍCIO definido para o frame: {limites_evento['inicio']} **")
+                    elif key == 'u':
+                        limites_evento['fim'] = state['current_idx']
+                        print(f"** Novo FIM definido para o frame: {limites_evento['fim']} **")
+                    
+                    # --- TECLAS MODIFICADAS ---
+                    elif key in ['c', 'i', 'b', 'n', 'q', 'd', 'a']:
                         user_choice['key'] = key
                         plt.close(event.canvas.figure)
+                        return
+                    
+                    update_display(state['current_idx'])
 
                 update_display(state['current_idx'])
                 posicionar_janela(fig)
@@ -278,21 +290,36 @@ if __name__ == "__main__":
                     elif resposta == 'i': classificacao = 'IC'
                     else: classificacao = 'Brilho' 
                     
-                    print(f"Evento {i+1} CLASSIFICADO como {classificacao}.")
+                    print(f"Evento {evento_idx+1} CLASSIFICADO como {classificacao}.")
                     
                     frame_referencia_idx = state['current_idx']
                     nome_arquivo_ref = os.path.basename(arquivos_img[frame_referencia_idx])
                     timestamp_str = os.path.splitext(nome_arquivo_ref)[0].split('_', 1)[1]
-                    num_frames_evento = fim - inicio + 1
+                    
+                    num_frames_evento = limites_evento['fim'] - limites_evento['inicio'] + 1
                     duracao_evento_ms = num_frames_evento * tempo_por_frame_ms
                     
                     nome_pasta_evento = f"{frame_referencia_idx:04d} {classificacao} {timestamp_str} Dur {duracao_evento_ms:.1f}ms"
                     
-                    # ALTERADO: Passando a figura atual (fig) e o índice do frame de pico
-                    salvar_evento_classificado(caminho_final_saida, nome_pasta_evento, evento, arquivos_img, fig, frame_referencia_idx)
+                    evento_final_para_salvar = (limites_evento['inicio'], limites_evento['fim'])
+                    salvar_evento_classificado(caminho_final_saida, nome_pasta_evento, evento_final_para_salvar, arquivos_img, fig, frame_referencia_idx)
                     eventos_salvos += 1
+                    evento_idx += 1
+                
                 elif resposta == 'n':
-                    print(f"Evento {i+1} REJEITADO.")
+                    print(f"Evento {evento_idx+1} REJEITADO.")
+                    evento_idx += 1
+                
+                # --- LÓGICA MODIFICADA ---
+                elif resposta == 'd':
+                    print("Avançando para o próximo evento...")
+                    evento_idx += 1
+                
+                # --- LÓGICA MODIFICADA ---
+                elif resposta == 'a':
+                    print("Retornando ao evento anterior...")
+                    evento_idx -= 1
+                
                 elif resposta == 'q':
                     print("Sessão de validação encerrada pelo usuário.")
                     break
