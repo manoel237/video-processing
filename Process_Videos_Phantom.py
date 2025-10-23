@@ -9,7 +9,8 @@ import matplotlib.gridspec as gridspec
 plt.style.use('dark_background')
 
 # 1. Pasta com todos os frames JPG de entrada
-CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y20250816H004139.629850000_UTC"
+CAMINHO_PASTA_ENTRADA = r"C:\Arquivos\Videos\Phantom\v9.1_FNN_Y20250816H005113.972845000_UTC"
+
 # 2. Pasta RAIZ onde todas as pastas de resultado serão criadas.
 PASTA_RAIZ_SAIDAS = r"C:\Arquivos\Videos\videos_classificados"
 
@@ -271,7 +272,7 @@ if __name__ == "__main__":
                         print(f"** Novo FIM definido para o frame: {limites_evento['fim']} **")
                     
                     # --- TECLAS MODIFICADAS ---
-                    elif key in ['c', 'i', 'b', 'n', 'q', 'd', 'a']:
+                    elif key in ['c', 'i', 'b', 'n', 'q', 'd', 'a','l']:
                         user_choice['key'] = key
                         plt.close(event.canvas.figure)
                         return
@@ -285,9 +286,10 @@ if __name__ == "__main__":
                 
                 resposta = user_choice['key']
 
-                if resposta in ['c', 'i', 'b']:
+                if resposta in ['c', 'i', 'b','l']:
                     if resposta == 'c': classificacao = 'CG'
                     elif resposta == 'i': classificacao = 'IC'
+                    elif resposta == 'l': classificacao = 'LCC'
                     else: classificacao = 'Brilho' 
                     
                     print(f"Evento {evento_idx+1} CLASSIFICADO como {classificacao}.")
